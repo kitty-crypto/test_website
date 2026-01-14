@@ -32,6 +32,7 @@
     top: 0;
     width: 100vw;
     box-sizing: border-box;
+    pointer-events: auto;
 
     padding: var(--outer-pad-y, 8px) var(--outer-pad-x, 8px) calc(var(--outer-pad-y, 8px) + env(safe-area-inset-bottom));
 
@@ -146,6 +147,18 @@
 #keyboard-emu button.sticky-on {
     background: var(--kb-sticky-bg);
     border-color: var(--kb-sticky-border);
+}
+
+#keyboard-emu .fn-grid-wrap,
+#keyboard-emu .fn-grid,
+#keyboard-emu .key-grid,
+#keyboard-emu button {
+    pointer-events: auto;
+}
+
+#keyboard-emu,
+#keyboard-emu * {
+    -webkit-tap-highlight-color: transparent;
 }
 
 #keyboard-emu .key-icon {

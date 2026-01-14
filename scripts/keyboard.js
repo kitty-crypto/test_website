@@ -82,6 +82,7 @@ export class keyboardEmu {
         this.__scheduleBound = this.__schedule.bind(this);
         this.__refocusEditableBound = this.__refocusEditable.bind(this);
         this.__onTouchMoveBound = this.__onTouchMove.bind(this);
+        this.__onDocClickCaptureBound = this.__onDocClickCapture.bind(this);
     }
 
     setIsMobile(v) {
@@ -97,20 +98,22 @@ export class keyboardEmu {
         const opts = options || {};
         this.opts = opts;
 
-        const allowRaw =
-            targets !== undefined
-                ? targets
-                : (opts.targets !== undefined
-                    ? opts.targets
-                    : (opts.target !== undefined
-                        ? opts.target
-                        : (opts.allowed !== undefined
-                            ? opts.allowed
-                            : (opts.allow !== undefined
-                                ? opts.allow
-                                : (opts.editables !== undefined
-                                    ? opts.editables
-                                    : (opts.editable !== undefined ? opts.editable : null))))));
+        const firstDefined = (...values) => {
+            for (const v of values) {
+                if (v !== undefined) return v;
+            }
+            return null;
+        };
+
+        const allowRaw = firstDefined(
+            targets,
+            opts.targets,
+            opts.target,
+            opts.allowed,
+            opts.allow,
+            opts.editables,
+            opts.editable
+        );
 
         const allowed = (() => {
             if (!allowRaw) return [];
@@ -223,6 +226,8 @@ export class keyboardEmu {
 
         this.__schedule();
 
+        document.addEventListener("click", this.__onDocClickCaptureBound, true);
+
         return this;
     }
 
@@ -267,7 +272,25 @@ export class keyboardEmu {
         this.vv = null;
         this.ro = null;
         this.raf = 0;
+
+        document.removeEventListener("click", this.__onDocClickCaptureBound, true);
+
+        return;
     }
+
+    __onDocClickCapture(e) {
+        if (!this.suppressNextClick) return;
+
+        this.suppressNextClick = false;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (typeof e.stopImmediatePropagation === "function") {
+            e.stopImmediatePropagation();
+        }
+    }
+
 
     __nextFrame() {
         return new Promise((resolve) => {
@@ -720,9 +743,10 @@ export class keyboardEmu {
 
         e.preventDefault();
         e.stopPropagation();
-
+        if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
         this.suppressNextClick = true;
-        this.__handleButtonPress((btn));
+
+        this.__handleButtonPress(btn);
 
         if (this.skipNextRefocus) {
             this.skipNextRefocus = false;
@@ -734,7 +758,9 @@ export class keyboardEmu {
 
     __onClick(e) {
         if (this.suppressNextClick) {
-            this.suppressNextClick = false;
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
             return;
         }
 
@@ -744,7 +770,7 @@ export class keyboardEmu {
         const btn = t.closest("button");
         if (!btn) return;
 
-        this.__handleButtonPress((btn));
+        this.__handleButtonPress(btn);
 
         if (this.skipNextRefocus) {
             this.skipNextRefocus = false;
