@@ -171,6 +171,7 @@ export class keyboardEmu {
         this.__applyResponsiveLabels(bar);
 
         this.mods = { ctrl: false, alt: false, meta: false, shift: false, fn: false };
+        this.__syncButtons();
 
         this.send =
             typeof opts.send === "function"
@@ -182,7 +183,6 @@ export class keyboardEmu {
 
         this.lastEditable = null;
 
-        const HIDDEN_Z = keyboardEmu.HIDDEN_Z;
         this.toolbarVisible = true;
 
         document.addEventListener("focusin", this.__onFocusInBound, true);
@@ -372,7 +372,6 @@ export class keyboardEmu {
         this.bar.style.opacity = visible ? "1" : "0";
         this.bar.style.pointerEvents = visible ? "auto" : "none";
         this.bar.style.setProperty("--toolbar-z", visible ? String(this.zIndex) : String(keyboardEmu.HIDDEN_Z));
-        //this.bar.setAttribute("aria-hidden", visible ? "false" : "true");
         this.bar.inert = !visible;
     }
 
@@ -491,6 +490,28 @@ export class keyboardEmu {
         else this.__fitToWidthDesktop();
     }
 
+    __fitFnRowToWidth() {
+        const wrap = (this.bar.querySelector(".fn-grid-wrap"));
+        const grid = (this.bar.querySelector(".fn-grid"));
+        if (!wrap || !grid) return;
+
+        if (!this.toolbarVisible || !this.mods.fn) {
+            grid.style.transform = "";
+            return;
+        }
+
+        const aw = wrap.clientWidth;
+        const sw = grid.scrollWidth;
+
+        if (!aw || !sw || !Number.isFinite(aw) || !Number.isFinite(sw)) {
+            grid.style.transform = "";
+            return;
+        }
+
+        const scale = Math.min(1, aw / sw);
+        grid.style.transform = scale < 1 ? `scale(${scale})` : "";
+    }
+
     __xtermModParam(m) {
         return (
             1 +
@@ -559,6 +580,32 @@ export class keyboardEmu {
             return s;
         }
 
+        if (/^F(1[0-2]|[1-9])$/.test(key)) {
+            const n = parseInt(key.slice(1), 10);
+            const mod = this.__xtermModParam(m);
+            const plain = mod === 1;
+
+            if (n >= 1 && n <= 4) {
+                const code = ["P", "Q", "R", "S"][n - 1];
+                return plain ? `\x1bO${code}` : `\x1b[1;${mod}${code}`;
+            }
+
+            const baseMap = {
+                5: 15,
+                6: 17,
+                7: 18,
+                8: 19,
+                9: 20,
+                10: 21,
+                11: 23,
+                12: 24
+            };
+
+            const base = baseMap[n];
+            if (!base) return "";
+            return plain ? `\x1b[${base}~` : `\x1b[${base};${mod}~`;
+        }
+
         const mod = this.__xtermModParam(m);
         const plain = mod === 1;
 
@@ -602,6 +649,15 @@ export class keyboardEmu {
         set("meta");
         set("shift");
         set("fn");
+
+        this.bar.classList.toggle("fn-on", !!this.mods.fn);
+
+        if (!this.mods.fn) {
+            const grid = (this.bar.querySelector(".fn-grid"));
+            if (grid) grid.style.transform = "";
+        }
+
+        this.__schedule();
     }
 
     __clearMods() {
@@ -771,6 +827,7 @@ export class keyboardEmu {
             this.raf = 0;
             this.__place();
             this.__fitToWidth();
+            this.__fitFnRowToWidth();
             this.__applyStackingIfNeeded();
             this.__place();
         });

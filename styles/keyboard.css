@@ -36,6 +36,8 @@
     padding: var(--outer-pad-y, 8px) var(--outer-pad-x, 8px) calc(var(--outer-pad-y, 8px) + env(safe-area-inset-bottom));
 
     display: flex;
+    flex-direction: column;
+    gap: var(--btn-gap);
     align-items: stretch;
     justify-content: center;
 
@@ -75,12 +77,37 @@
     pointer-events: none;
 }
 
+#keyboard-emu .fn-grid-wrap {
+    display: none;
+    width: 100%;
+    overflow: hidden;
+}
+
+#keyboard-emu.fn-on .fn-grid-wrap {
+    display: flex;
+    justify-content: center;
+}
+
+#keyboard-emu .fn-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--key-w);
+    grid-template-rows: var(--key-h);
+    gap: var(--btn-gap);
+    align-items: stretch;
+    justify-content: start;
+
+    transform-origin: center top;
+    will-change: transform;
+}
+
 #keyboard-emu .key-grid {
     display: grid;
     grid-template-columns: repeat(7, var(--key-w));
     grid-template-rows: repeat(2, var(--key-h));
     gap: var(--btn-gap);
     align-items: stretch;
+    justify-content: center;
 }
 
 #keyboard-emu button {
