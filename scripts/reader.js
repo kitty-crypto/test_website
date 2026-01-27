@@ -1,6 +1,10 @@
 import { replaceTategaki } from './tategaki.js';
 import { replaceSmsMessages, replaceEmails, replaceSVGs, replaceTooltips, bindEmailActions } from "./mediaStyler.js";
 
+const READER_PARA_NUMS_COOKIE = "showParagraphNumbers";
+const READER_PARA_NUMS_CLASS = "reader-show-paragraph-numbers";
+const PNUM_TOGGLE_SELECTOR = ".btn-toggle-paragraph-numbers";
+
 window.params = new URLSearchParams(window.location.search);
 window.storyPath = window.params.get("story");;
 window.storyName = window.storyPath ? window.storyPath.split("/").pop() : null;
@@ -17,6 +21,7 @@ window.readerRoot = document.getElementById("reader");
 window.storyPickerRoot = document.getElementById("story-picker");
 
 window.buttons = {
+  toggleParagraphNumbers: { icon: "🔢", action: "Toggle paragraph numbers" },
   clearBookmark: { icon: "↩️", action: "Clear bookmark for this chapter" },
   prevChapter: { icon: "⏪", action: "Previous chapter" },
   jumpToChapter: { icon: "🆗", action: "Jump to chapter" },
@@ -39,6 +44,92 @@ function getReaderCookie(name, root = document) {
   const cookies = root.cookie.split("; ");
   const cookie = cookies.find(row => row.startsWith(`reader_${name}=`));
   return cookie ? cookie.split("=")[1] : null;
+}
+
+function renderPNum(root = document) {
+  const reader = window.readerRoot;
+  if (!reader) return;
+
+  const getBMindx = (id) => {
+    const m = /-(\d+)$/.exec(id);
+    if (!m) return null;
+
+    const n = Number(m[1]);
+    if (!Number.isFinite(n)) return null;
+
+    return n;
+  };
+
+  const getDigits = (total) => {
+    const maxIndex = Math.max(0, total - 1);
+    return String(maxIndex).length;
+  };
+
+  const bookmarks = Array.from(reader.querySelectorAll(".reader-bookmark"));
+  const total = bookmarks.length;
+  if (total === 0) return;
+
+  const digits = getDigits(total);
+
+  reader.style.setProperty("--reader-para-num-col-width", `${digits}ch`);
+  reader.style.setProperty("--reader-para-num-gap", "0.9em");
+
+  for (const el of bookmarks) {
+    const index = getBMindx(el.id);
+    if (index === null) continue;
+
+    const label = String(index).padStart(digits, "0");
+
+    let num = el.querySelector(":scope > .reader-paragraph-num");
+    if (!num) {
+      num = document.createElement("span");
+      num.className = "reader-paragraph-num";
+      num.setAttribute("aria-hidden", "true");
+      el.insertAdjacentElement("afterbegin", num);
+    }
+
+    if (num.textContent !== label) num.textContent = label;
+  }
+}
+
+function enablePNum(enabled) {
+  const reader = window.readerRoot;
+  if (!reader) return;
+
+  const syncPNumToggleButtons = (enabled, root = document) => {
+    root.querySelectorAll(PNUM_TOGGLE_SELECTOR).forEach(btn => {
+      btn.classList.toggle("menu-crossed", enabled);
+    });
+  };
+
+  reader.classList.toggle(READER_PARA_NUMS_CLASS, enabled);
+  setReaderCookie(READER_PARA_NUMS_COOKIE, enabled ? "true" : "false");
+
+  syncPNumToggleButtons(enabled, document);
+
+  if (!enabled) return;
+  renderPNum(document);
+}
+
+function refreshPNum(root = document) {
+  const reader = window.readerRoot;
+  if (!reader) return;
+  if (!reader.classList.contains(READER_PARA_NUMS_CLASS)) return;
+
+  renderPNum(root);
+}
+
+function togglePNum() {
+  const reader = window.readerRoot;
+  if (!reader) return;
+
+  const next = !reader.classList.contains(READER_PARA_NUMS_CLASS);
+  enablePNum(next);
+}
+
+function initPNumCookie() {
+  const v = getReaderCookie(READER_PARA_NUMS_COOKIE);
+  enablePNum(v === "true");
 }
 
 // Helper to check for aliases of tags in the cleaned or bloated XML
@@ -101,6 +192,7 @@ function injectNav() {
   // if page is not "reader.html" return
   const navHTML = `
   <div class="chapter-navigation">
+    <button class="btn-toggle-paragraph-numbers">${window.buttons.toggleParagraphNumbers.icon}</button>
     <button class="btn-clear-bookmark">${window.buttons.clearBookmark.icon}</button>
     <button class="btn-prev">${window.buttons.prevChapter.icon}</button>
     <input class="chapter-display" type="text" value="1" readonly style="width: 2ch; text-align: center; border: none; background: transparent; font-weight: bold;" />
@@ -145,7 +237,7 @@ function updateFontSize(delta = 0) {
 
 function showNavigationInfo() {
   alert(`Navigation Button Guide:
-
+  ${window.buttons.toggleParagraphNumbers.icon}  – ${window.buttons.toggleParagraphNumbers.action}
   ${window.buttons.clearBookmark.icon}  – ${window.buttons.clearBookmark.action}
   ${window.buttons.prevChapter.icon}  – ${window.buttons.prevChapter.action}
   ${window.buttons.jumpToChapter.icon}  – ${window.buttons.jumpToChapter.action}
@@ -161,6 +253,11 @@ Font Controls:
 
 function bindNavigationEvents(root = document) {
   const chapters = JSON.parse(localStorage.getItem(window.chapterCacheKey) || "[]");
+
+  root.querySelectorAll(".btn-toggle-paragraph-numbers").forEach(btn => {
+    btn.onclick = () => togglePNum();
+  });
+
   root.querySelectorAll(".btn-prev").forEach(btn => btn.onclick = () => {
     if (!prevBtnEn(window.chapter, chapters)) {
       btn.disabled = true;
@@ -305,7 +402,7 @@ async function loadChapter(n) {
     }).join("\n");
 
     // Process Special Tags
-    
+
     htmlContent = await replaceEmails(htmlContent);
     htmlContent = await replaceSmsMessages(htmlContent);
     htmlContent = await replaceTategaki(htmlContent);
@@ -316,6 +413,8 @@ async function loadChapter(n) {
     // Render the HTML
     window.readerRoot.innerHTML = htmlContent;
     await replaceSVGs(window.readerRoot);
+
+    refreshPNum(document);
 
     // Start tracking scroll progress
     observeAndSaveBookmarkProgress(document);
@@ -464,6 +563,7 @@ async function initReader() {
   if (!window.storyPath) return;
 
   injectNav();
+  initPNumCookie();
 
   const chapters = await discoverChapters();
 
@@ -912,6 +1012,8 @@ async function renderXmlDoc(xmlDoc, opts) {
 
   window.readerRoot.innerHTML = htmlContent;
   await replaceSVGs(window.readerRoot);
+
+  refreshPNum(document);
 
   observeAndSaveBookmarkProgress(document);
   activateImageNavigation(document);
