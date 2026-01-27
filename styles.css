@@ -1261,6 +1261,29 @@ body.no-scroll {
   color: var(--body-text-colour);
 }
 
+/* Only the crossed state gets a positioning context */
+.chapter-navigation button.menu-crossed {
+  position: relative;
+}
+
+/* Draw the slash without changing the button box model */
+.chapter-navigation button.menu-crossed::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  /* A bit wider than the glyph so it actually crosses the emoji */
+  width: 160%;
+  height: 2px;
+
+  background: red;
+  transform: translate(-50%, -50%) rotate(45deg);
+  transform-origin: center;
+
+  pointer-events: none;
+}
+
 /* =========================================
   Chapter Navigation Inputs
 ========================================= */
@@ -1505,6 +1528,13 @@ body.no-scroll {
   max-width: calc(65ch + var(--reader-para-num-col-width) + var(--reader-para-num-gap));
   margin-left: auto;
   margin-right: auto;
+
+  /* ⬇⬇ moved from odd-only to all rows */
+  border-radius: 10px;
+  padding: 0 0.6em;
+
+  /* make sure grid items don't "centre themselves" */
+  justify-items: stretch;
 }
 
 /* The number column */
@@ -1522,13 +1552,19 @@ body.no-scroll {
 
 /* Subtle alternating background while numbering is enabled */
 #reader.reader-show-paragraph-numbers .reader-bookmark:nth-child(odd) {
-  border-radius: 10px;
-  padding: 0 0.6em;
   background-color: rgba(0, 0, 0, 0.03);
 }
 
 .dark-mode #reader.reader-show-paragraph-numbers .reader-bookmark:nth-child(odd) {
   background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* When numbered, let the wrapper control width; keep normal alignment */
+#reader.reader-show-paragraph-numbers .reader-bookmark > :is(.reader-paragraph, .reader-title, .reader-subtitle, .reader-quote) {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  justify-self: stretch;
 }
 
 /* =========================================
