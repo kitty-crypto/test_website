@@ -145,7 +145,8 @@ class ReadAloudModule {
             speechRate: 1.0,
             configVisible: false,
             menuVisible: true,
-            buffer: null
+            buffer: null,
+            currentAudioUrl: null,
         };
     }
 
@@ -186,6 +187,20 @@ class ReadAloudModule {
             '"': '&quot;'
         }[c]));
     }
+
+    __getParagraphPlainText(paragraph) {
+        if (!paragraph) return '';
+
+        // Clone so we do not mutate the DOM
+        const clone = paragraph.cloneNode(true);
+
+        // Strip reader UI artefacts
+        clone.querySelectorAll('.reader-paragraph-num, .bookmark-emoji').forEach(n => n.remove());
+
+        // Prefer textContent so we do not accidentally pull in layout-only text
+        return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
 
     __buildSSML(text, voiceName, rate) {
         const rateMap = {
@@ -600,7 +615,7 @@ class ReadAloudModule {
         this.__highlightP(paragraph);
         this.__scrollToP(paragraph);
 
-        const plainText = paragraph.innerText.replace(/\s+/g, ' ').trim();
+        const plainText = this.__getParagraphPlainText(paragraph);
         if (!plainText) {
             await this.__speakP(idx + 1);
             return;
@@ -675,7 +690,7 @@ class ReadAloudModule {
         if (idx >= state.paragraphs.length) return null;
 
         const paragraph = state.paragraphs[idx];
-        const plainText = paragraph.innerText.replace(/\s+/g, ' ').trim();
+        const plainText = this.__getParagraphPlainText(paragraph);
         if (!plainText) return null;
 
         const ssml = this.__buildSSML(plainText, state.voiceName, state.speechRate);
@@ -716,28 +731,53 @@ class ReadAloudModule {
 
     async __playAudioBlob(audioData) {
         return new Promise((resolve, reject) => {
+            const state = window.readAloudState;
+
             const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
 
-            window.readAloudState.currentAudio = audio;
+            state.currentAudio = audio;
+            state.currentAudioUrl = audioUrl;
+
+            let settled = false;
+
+            const cleanup = () => {
+                if (state.currentAudio === audio) state.currentAudio = null;
+
+                if (state.currentAudioUrl === audioUrl) {
+                    URL.revokeObjectURL(audioUrl);
+                    state.currentAudioUrl = null;
+                } else {
+                    URL.revokeObjectURL(audioUrl);
+                }
+            };
 
             audio.onpause = () => {
-                const wasInterrupted = !audio.ended && !window.readAloudState.paused;
+                const wasInterrupted = !audio.ended && !state.paused;
                 if (wasInterrupted) this.__pause();
             };
 
             audio.onended = () => {
-                window.readAloudState.currentAudio = null;
+                if (settled) return;
+                settled = true;
+                cleanup();
                 resolve();
             };
 
-            audio.onerror = e => {
-                window.readAloudState.currentAudio = null;
+            audio.onerror = (e) => {
+                if (settled) return;
+                settled = true;
+                cleanup();
                 reject(e);
             };
 
-            audio.play();
+            audio.play().catch(err => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                reject(err);
+            });
         });
     }
 
@@ -797,6 +837,11 @@ class ReadAloudModule {
             state.currentAudio.pause();
             state.currentAudio.currentTime = 0;
             state.currentAudio = null;
+        }
+
+        if (state.currentAudioUrl) {
+            URL.revokeObjectURL(state.currentAudioUrl);
+            state.currentAudioUrl = null;
         }
 
         if (state.synthesizer && typeof state.synthesizer.stopSpeakingAsync === 'function') {
