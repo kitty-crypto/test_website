@@ -1,7 +1,7 @@
 //import { loadBanner, setupTerminalWindow, scaleBannerToFit } from "./banner.js";
 import { setupTerminalModule } from "./terminal.js";
 import { setupReaderToggle } from "./readerMode.js";
-import { showReadAloudMenu } from "./readAloud.js";
+import * as readAloud from "./readAloud.js";
 import { keyboardEmu } from "./keyboard.js";
 import * as loader from "./loader.js";
 
@@ -248,7 +248,7 @@ async function initialiseUI() {
     document.body.appendChild(readAloudToggle);
 
     if (readAloudToggle)
-      readAloudToggle.addEventListener("click", showReadAloudMenu);
+      readAloudToggle.addEventListener("click", readAloud.showMenu);
 
     if (params.has("darkmode")) {
       const v = params.get("darkmode").toLowerCase();
