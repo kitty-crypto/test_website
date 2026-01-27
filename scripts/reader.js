@@ -50,14 +50,20 @@ function renderPNum(root = document) {
   const reader = window.readerRoot;
   if (!reader) return;
 
-  const getBMindx = (id) => {
-    const m = /-(\d+)$/.exec(id);
-    if (!m) return null;
+  const isNonEmptyBookmark = (bookmarkEl) => {
+    const contentEl = bookmarkEl.firstElementChild;
+    if (!contentEl) return false;
 
-    const n = Number(m[1]);
-    if (!Number.isFinite(n)) return null;
+    const clone = contentEl.cloneNode(true);
 
-    return n;
+    // Ignore UI artefacts when deciding emptiness
+    clone.querySelectorAll(".reader-paragraph-num, .bookmark-emoji").forEach(n => n.remove());
+
+    // Treat media as content even if text is empty
+    if (clone.querySelector("img, svg, video, audio, iframe")) return true;
+
+    const text = (clone.textContent || "").replace(/\s+/g, "").trim();
+    return text.length > 0;
   };
 
   const getDigits = (total) => {
@@ -65,8 +71,22 @@ function renderPNum(root = document) {
     return String(maxIndex).length;
   };
 
-  const bookmarks = Array.from(reader.querySelectorAll(".reader-bookmark"));
-  const total = bookmarks.length;
+  const allBookmarks = Array.from(reader.querySelectorAll(".reader-bookmark"));
+
+  // Build list of bookmarks that should receive numbers
+  const numberedBookmarks = [];
+  for (const el of allBookmarks) {
+    if (isNonEmptyBookmark(el)) {
+      numberedBookmarks.push(el);
+      continue;
+    }
+
+    // Ensure empties never keep an old number
+    const existing = el.querySelector(":scope > .reader-paragraph-num");
+    if (existing) existing.remove();
+  }
+
+  const total = numberedBookmarks.length;
   if (total === 0) return;
 
   const digits = getDigits(total);
@@ -74,11 +94,9 @@ function renderPNum(root = document) {
   reader.style.setProperty("--reader-para-num-col-width", `${digits}ch`);
   reader.style.setProperty("--reader-para-num-gap", "0.9em");
 
-  for (const el of bookmarks) {
-    const index = getBMindx(el.id);
-    if (index === null) continue;
-
-    const label = String(index).padStart(digits, "0");
+  for (let ordinal = 0; ordinal < numberedBookmarks.length; ordinal += 1) {
+    const el = numberedBookmarks[ordinal];
+    const label = String(ordinal).padStart(digits, "0");
 
     let num = el.querySelector(":scope > .reader-paragraph-num");
     if (!num) {
@@ -96,10 +114,17 @@ function enablePNum(enabled) {
   const reader = window.readerRoot;
   if (!reader) return;
 
-  const syncPNumToggleButtons = (enabled, root = document) => {
+  const syncPNumToggleButtons = (isEnabled, root = document) => {
     root.querySelectorAll(PNUM_TOGGLE_SELECTOR).forEach(btn => {
-      btn.classList.toggle("menu-crossed", enabled);
+      // "crossed" typically indicates OFF
+      btn.classList.toggle("menu-crossed", !isEnabled);
     });
+  };
+
+  const removeInjectedPNums = () => {
+    reader.querySelectorAll(".reader-paragraph-num").forEach(n => n.remove());
+    reader.style.removeProperty("--reader-para-num-col-width");
+    reader.style.removeProperty("--reader-para-num-gap");
   };
 
   reader.classList.toggle(READER_PARA_NUMS_CLASS, enabled);
@@ -107,7 +132,11 @@ function enablePNum(enabled) {
 
   syncPNumToggleButtons(enabled, document);
 
-  if (!enabled) return;
+  if (!enabled) {
+    removeInjectedPNums();
+    return;
+  }
+
   renderPNum(document);
 }
 
@@ -769,13 +798,33 @@ export async function injectBookmarksIntoHTML(htmlContent, storyBase, chapter) {
   const bookmarkId = localStorage.getItem(`bookmark_${storyKey}_ch${chapter}`);
   let counter = 0;
 
+  const isMeaningfulInnerHtml = (innerHtml) => {
+    // Media counts as meaningful even without text
+    if (/<(img|svg|video|audio|iframe)\b/i.test(innerHtml)) return true;
+
+    // Remove tags and whitespace and common non-breaking spaces
+    const text = innerHtml
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;|&#160;/gi, "")
+      .replace(/\s+/g, "")
+      .trim();
+
+    return text.length > 0;
+  };
+
   return htmlContent.replace(
     /<(p|h1|h2|blockquote)(.*?)>([\s\S]*?)<\/\1>/g,
     (match, tag, attrs, inner) => {
-      const id = `bm-${storyKey}-ch${chapter}-${counter++}`;
+      // Keep empty paragraphs as-is: no bookmark wrapper, no id, no counting
+      if (!isMeaningfulInnerHtml(inner)) return match;
+
+      const id = `bm-${storyKey}-ch${chapter}-${counter}`;
+      counter += 1;
+
       const emojiSpan = id === bookmarkId
         ? `<span class="bookmark-emoji" aria-label="bookmark">🔖</span> `
         : "";
+
       return `<div class="reader-bookmark" id="${id}"><${tag}${attrs}>${emojiSpan}${inner}</${tag}></div>`;
     }
   );
