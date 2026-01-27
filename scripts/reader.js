@@ -117,7 +117,7 @@ function enablePNum(enabled) {
   const syncPNumToggleButtons = (isEnabled, root = document) => {
     root.querySelectorAll(PNUM_TOGGLE_SELECTOR).forEach(btn => {
       // "crossed" typically indicates OFF
-      btn.classList.toggle("menu-crossed", !isEnabled);
+      btn.classList.toggle("menu-crossed", isEnabled);
     });
   };
 
