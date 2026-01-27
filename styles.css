@@ -2829,7 +2829,7 @@ body.reader-mode {
 #read-aloud-menu .read-aloud-fields,
 #read-aloud-menu .read-aloud-buttons {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: wrap;
   width: 100%;
   align-items: center;
