@@ -3,7 +3,7 @@ import * as loader from './loader.js';
 
 async function ensureSpeechSDKReady() {
     const SPEECH_SDK_CDN =
-        "https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.44.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js";
+        "https://kittycrypto.gg/external?src=https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.44.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js";
 
     if (window.SpeechSDK) return window.SpeechSDK;
     if (window._speechSDKReadyPromise) return window._speechSDKReadyPromise;

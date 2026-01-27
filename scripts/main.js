@@ -11,7 +11,7 @@ let pendingWebUiTheme = null;
 
 async function checkMobile() {
   const MOBILE_DETECT_CDN =
-    "https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.js";
+    "https://kittycrypto.gg/external?src=https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.js";
 
   // while (document.readyState === 'loading') {
   //   await new Promise(r => requestAnimationFrame(r));
