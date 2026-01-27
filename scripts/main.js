@@ -3,24 +3,29 @@ import { setupTerminalModule } from "./terminal.js";
 import { setupReaderToggle } from "./readerMode.js";
 import { showReadAloudMenu } from "./readAloud.js";
 import { keyboardEmu } from "./keyboard.js";
+import * as loader from "./loader.js";
 
 const params = new URLSearchParams(window.location.search);
 let terminalMod = null;
 let pendingWebUiTheme = null;
 
 async function checkMobile() {
-  while (document.readyState === 'loading') {
-    await new Promise(r => requestAnimationFrame(r));
-  }
+  const MOBILE_DETECT_CDN =
+    "https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.js";
+
+  // while (document.readyState === 'loading') {
+  //   await new Promise(r => requestAnimationFrame(r));
+  // }
 
   if (!window.MobileDetect) {
-    await new Promise(r => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.min.js';
-      s.onload = r;
-      s.onerror = r;
-      document.body.appendChild(s);
-    });
+    // await new Promise(r => {
+    //   const s = document.createElement('script');
+    //   s.src = 'https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.min.js';
+    //   s.onload = r;
+    //   s.onerror = r;
+    //   document.body.appendChild(s);
+    // });
+    await loader.loadScript(MOBILE_DETECT_CDN, { asModule: false });
   }
 
   const ua = navigator.userAgent;

@@ -1,4 +1,28 @@
 import { forceBookmark } from './reader.js'
+import * as loader from './loader.js';
+
+async function ensureSpeechSDKReady() {
+    const SPEECH_SDK_CDN =
+        "https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.44.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js";
+
+    if (window.SpeechSDK) return window.SpeechSDK;
+    if (window._speechSDKReadyPromise) return window._speechSDKReadyPromise;
+
+    window._speechSDKReadyPromise = (async () => {
+        await loader.loadScript(SPEECH_SDK_CDN);
+
+        if (!window.SpeechSDK) {
+            throw new Error("SpeechSDK loaded but not available on window");
+        }
+
+        return window.SpeechSDK;
+    })().catch(err => {
+        window._speechSDKReadyPromise = null;
+        throw err;
+    });
+
+    return window._speechSDKReadyPromise;
+}
 
 const buttons = {
     play: { icon: "▶️", action: "Start Read Aloud" },
@@ -195,10 +219,10 @@ export function showReadAloudMenu() {
 
     // Restore from localStorage etc.
     menuElements.apikeyInput.value = localStorage.getItem('readAloudSpeechApiKey') || '';
-    
+
     toggleReadAloudConfig(
         !localStorage.getItem('readAloudConfigMenuHidden') ||
-        localStorage.getItem('readAloudConfigMenuHidden') === 'false'
+            localStorage.getItem('readAloudConfigMenuHidden') === 'false'
             ? true
             : window.readAloudState.configVisible
     );
@@ -287,7 +311,7 @@ export function showReadAloudMenu() {
     });
 
     window.readAloudState.speechRate = getSpeechRate();
-    
+
     enableNavigatorControls();
 
     /*const initialiseMenuDrag = async () => {
@@ -320,21 +344,21 @@ export function showReadAloudMenu() {
 
 function enableNavigatorControls() {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', async () => {
-        await resumeReadAloud();
-      });
-    
-      navigator.mediaSession.setActionHandler('pause', async () => {
-        await pauseReadAloud();
-      });
-    
-      navigator.mediaSession.setActionHandler('previoustrack', async () => {
-        await prevParagraph();
-      });
-    
-      navigator.mediaSession.setActionHandler('nexttrack', async () => {
-        await nextParagraph();
-      });
+        navigator.mediaSession.setActionHandler('play', async () => {
+            await resumeReadAloud();
+        });
+
+        navigator.mediaSession.setActionHandler('pause', async () => {
+            await pauseReadAloud();
+        });
+
+        navigator.mediaSession.setActionHandler('previoustrack', async () => {
+            await prevParagraph();
+        });
+
+        navigator.mediaSession.setActionHandler('nexttrack', async () => {
+            await nextParagraph();
+        });
     }
 }
 
@@ -513,25 +537,25 @@ async function speakParagraph(idx) {
         await speakParagraph(idx + 1);
         return;
     }
-    
+
     if ('mediaSession' in navigator) {
-      const params = new URLSearchParams(window.location.search);
-      const rawStory = params.get('story') || '';
-      const chapter = params.get('chapter') || '';
-    
-      const storyName = decodeURIComponent(rawStory).split('/').pop() || 'Unknown Story';
-      const chapterName = `Chapter ${chapter}`;
-      const artist = window.location.origin;
-    
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: plainText.slice(0, 60),
-        artist,
-        album: storyName,
-        track: chapterName,
-        artwork: []
-      });
+        const params = new URLSearchParams(window.location.search);
+        const rawStory = params.get('story') || '';
+        const chapter = params.get('chapter') || '';
+
+        const storyName = decodeURIComponent(rawStory).split('/').pop() || 'Unknown Story';
+        const chapterName = `Chapter ${chapter}`;
+        const artist = window.location.origin;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: plainText.slice(0, 60),
+            artist,
+            album: storyName,
+            track: chapterName,
+            artwork: []
+        });
     }
-    
+
     if (!state.speechKey || !state.serviceRegion) {
         window.alert('Please enter your Azure Speech API key and region in the Read Aloud menu.');
         return;
@@ -551,7 +575,7 @@ async function speakParagraph(idx) {
         paragraphId: state.currentParagraphId,
         paragraphIndex: state.currentParagraphIndex
     }));
-    
+
     forceBookmark(state.currentParagraphId);
 
     let audioData;
@@ -627,14 +651,14 @@ async function playAudioBlob(audioData) {
         const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
-        
+
         // Save the audio reference to state
         window.readAloudState.currentAudio = audio;
-        
+
         audio.onpause = () => {
-          // Only trigger pauseReadAloud if audio wasn't expected to pause as part of normal flow
-          const wasInterrupted = !audio.ended && !window.readAloudState.paused;
-          if (wasInterrupted) pauseReadAloud();
+            // Only trigger pauseReadAloud if audio wasn't expected to pause as part of normal flow
+            const wasInterrupted = !audio.ended && !window.readAloudState.paused;
+            if (wasInterrupted) pauseReadAloud();
         };
 
         audio.onended = () => {
@@ -650,25 +674,25 @@ async function playAudioBlob(audioData) {
 }
 
 async function pauseReadAloud() {
-  const state = window.readAloudState;
-  state.paused = true;
+    const state = window.readAloudState;
+    state.paused = true;
 
-  if (state.currentAudio) state.currentAudio.pause();
+    if (state.currentAudio) state.currentAudio.pause();
 
-  fadeOutHighlight(state.paragraphs[state.currentParagraphIndex]);
+    fadeOutHighlight(state.paragraphs[state.currentParagraphIndex]);
 
-  await stopSpeakingAsync();
+    await stopSpeakingAsync();
 
-  localStorage.setItem('readAloudAudioPosition', JSON.stringify({
-    paragraphId: state.currentParagraphId,
-    paragraphIndex: state.currentParagraphIndex
-  }));
+    localStorage.setItem('readAloudAudioPosition', JSON.stringify({
+        paragraphId: state.currentParagraphId,
+        paragraphIndex: state.currentParagraphIndex
+    }));
 
-  const playPauseBtn = document.getElementById('read-aloud-toggle-playpause');
-  if (playPauseBtn) {
-    playPauseBtn.textContent = buttons.play.icon;
-    playPauseBtn.title = buttons.play.action;
-  }
+    const playPauseBtn = document.getElementById('read-aloud-toggle-playpause');
+    if (playPauseBtn) {
+        playPauseBtn.textContent = buttons.play.icon;
+        playPauseBtn.title = buttons.play.action;
+    }
 }
 
 async function resumeReadAloud() {
@@ -1006,50 +1030,50 @@ export async function reloadReadAloud() {
     });
 }
 
-async function ensureSpeechSDKReady() {
-    if (window.SpeechSDK) return window.SpeechSDK;
-    if (window._speechSDKReadyPromise) return window._speechSDKReadyPromise;
+// async function ensureSpeechSDKReady() {
+//     if (window.SpeechSDK) return window.SpeechSDK;
+//     if (window._speechSDKReadyPromise) return window._speechSDKReadyPromise;
 
-    window._speechSDKReadyPromise = new Promise((resolve, reject) => {
-        if (window.SpeechSDK) return resolve(window.SpeechSDK);
+//     window._speechSDKReadyPromise = new Promise((resolve, reject) => {
+//         if (window.SpeechSDK) return resolve(window.SpeechSDK);
 
-        let script = document.querySelector("script[src*='msSpeechSDK.js']");
+//         let script = document.querySelector("script[src*='msSpeechSDK.js']");
 
-        const handleLoad = () =>
-            window.SpeechSDK
-                ? resolve(window.SpeechSDK)
-                : reject(new Error("SpeechSDK loaded but not available on window"));
+//         const handleLoad = () =>
+//             window.SpeechSDK
+//                 ? resolve(window.SpeechSDK)
+//                 : reject(new Error("SpeechSDK loaded but not available on window"));
 
-        const handleError = (e) => {
-            window._speechSDKReadyPromise = null;
-            reject(e);
-        };
+//         const handleError = (e) => {
+//             window._speechSDKReadyPromise = null;
+//             reject(e);
+//         };
 
-        // If no script tag, create it and set listeners
-        if (!script) {
-            script = document.createElement("script");
-            script.src = "./scripts/msSpeechSDK.js";
-            script.async = true;
-            script.onload = handleLoad;
-            script.onerror = handleError;
-            document.head.appendChild(script);
-            return;
-        }
+//         // If no script tag, create it and set listeners
+//         if (!script) {
+//             script = document.createElement("script");
+//             script.src = "./scripts/msSpeechSDK.js";
+//             script.async = true;
+//             script.onload = handleLoad;
+//             script.onerror = handleError;
+//             document.head.appendChild(script);
+//             return;
+//         }
 
-        // Script tag already present, check for SDK or listen
-        if (window.SpeechSDK) return resolve(window.SpeechSDK);
+//         // Script tag already present, check for SDK or listen
+//         if (window.SpeechSDK) return resolve(window.SpeechSDK);
 
-        const loaded = script.readyState === "complete" || script.readyState === "loaded";
-        if (loaded) {
-            window.SpeechSDK
-                ? resolve(window.SpeechSDK)
-                : reject(new Error("SpeechSDK script loaded but SpeechSDK not found on window"));
-            return;
-        }
+//         const loaded = script.readyState === "complete" || script.readyState === "loaded";
+//         if (loaded) {
+//             window.SpeechSDK
+//                 ? resolve(window.SpeechSDK)
+//                 : reject(new Error("SpeechSDK script loaded but SpeechSDK not found on window"));
+//             return;
+//         }
 
-        script.addEventListener("load", handleLoad);
-        script.addEventListener("error", handleError);
-    });
+//         script.addEventListener("load", handleLoad);
+//         script.addEventListener("error", handleError);
+//     });
 
-    return window._speechSDKReadyPromise;
-}
+//     return window._speechSDKReadyPromise;
+// }
