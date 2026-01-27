@@ -1559,7 +1559,7 @@ body.no-scroll {
 }
 
 /* When numbered, let the wrapper control width; keep normal alignment */
-#reader.reader-show-paragraph-numbers .reader-bookmark > :is(.reader-paragraph, .reader-title, .reader-subtitle, .reader-quote) {
+#reader.reader-show-paragraph-numbers .reader-bookmark> :is(.reader-paragraph, .reader-title, .reader-subtitle, .reader-quote) {
   max-width: none;
   margin-left: 0;
   margin-right: 0;
@@ -2749,6 +2749,35 @@ body.reader-mode {
     opacity 0.2s,
     left 0.2s,
     top 0.2s;
+}
+
+#read-aloud-menu .read-aloud-jump {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 10px;
+}
+
+#read-aloud-menu .read-aloud-jump-input {
+  flex: 0 0 auto;
+  width: 6ch;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--chat-input-bg-colour);
+  color: var(--chat-input-text-colour);
+  border: 1px solid var(--chat-input-border-colour);
+  box-sizing: border-box;
+  appearance: textfield;
+}
+
+#read-aloud-menu .read-aloud-jump-input::-webkit-outer-spin-button,
+#read-aloud-menu .read-aloud-jump-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 #read-aloud-menu.dragging {

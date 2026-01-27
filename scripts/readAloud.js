@@ -71,15 +71,29 @@ class ReadAloudModule {
                     </select>
                 </div>
                 <div class="read-aloud-buttons">
-                    <button id="read-aloud-toggle-playpause" title = ${this.#buttons.play.action}>${this.#buttons.play.icon}</button>
-                    <button id="read-aloud-prev" title = ${this.#buttons.prev.action}>${this.#buttons.prev.icon}</button>
-                    <button id="read-aloud-next" title = ${this.#buttons.next.action}>${this.#buttons.next.icon}</button>
-                    <button id="read-aloud-stop" title = ${this.#buttons.stop.action}>${this.#buttons.stop.icon}</button>
-                    <button id="read-aloud-restart" title = ${this.#buttons.restart.action}>${this.#buttons.restart.icon}</button>
-                    <button id="read-aloud-info" title = ${this.#buttons.info.action}>${this.#buttons.info.icon}</button>
-                    <button id="read-aloud-hide" class = "menu-crossed" title = ${this.#buttons.hide.action}>${this.#buttons.hide.icon}</button>
-                    <button id="read-aloud-config" class = "menu-crossed" title = ${this.#buttons.config.action}>${this.#buttons.config.icon}</button>
-                    <button id="read-aloud-help" title = ${this.#buttons.help.action}>${this.#buttons.help.icon}</button>
+                    <button id="read-aloud-toggle-playpause" title="${this.#buttons.play.action}">${this.#buttons.play.icon}</button>
+                    <button id="read-aloud-prev" title="${this.#buttons.prev.action}">${this.#buttons.prev.icon}</button>
+                    <button id="read-aloud-next" title="${this.#buttons.next.action}">${this.#buttons.next.icon}</button>
+                    <button id="read-aloud-stop" title="${this.#buttons.stop.action}">${this.#buttons.stop.icon}</button>
+                    <button id="read-aloud-restart" title="${this.#buttons.restart.action}">${this.#buttons.restart.icon}</button>
+                    <button id="read-aloud-info" title="${this.#buttons.info.action}">${this.#buttons.info.icon}</button>
+                    <button id="read-aloud-hide" class = "menu-crossed" title="${this.#buttons.hide.action}">${this.#buttons.hide.icon}</button>
+                    <button id="read-aloud-config" class = "menu-crossed" title="${this.#buttons.config.action}">${this.#buttons.config.icon}</button>
+                    <button id="read-aloud-help" title="${this.#buttons.help.action}">${this.#buttons.help.icon}</button>
+                    <div class="read-aloud-jump">
+                        <input
+                            id="read-aloud-jump-input"
+                            class="read-aloud-jump-input"
+                            type="number"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            min="1"
+                            step="1"
+                            placeholder="¶ #"
+                            title="Paragraph number"
+                        />
+                        <button id="read-aloud-jump-go" title="Jump to paragraph">✅</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -233,7 +247,9 @@ class ReadAloudModule {
             configBtn: document.getElementById('read-aloud-config'),
             hideBtn: document.getElementById('read-aloud-hide'),
             infoBtn: document.getElementById('read-aloud-info'),
-            helpBtn: document.getElementById('read-aloud-help')
+            helpBtn: document.getElementById('read-aloud-help'),
+            jumpInput: document.getElementById('read-aloud-jump-input'),
+            jumpGoBtn: document.getElementById('read-aloud-jump-go')
         };
 
         const missing = Object.entries(menuElements)
@@ -317,6 +333,26 @@ class ReadAloudModule {
 
         menuElements.hideBtn.addEventListener('click', () => {
             this.__toggleVis();
+        });
+
+        const doJump = async () => {
+            const raw = menuElements.jumpInput.value.trim();
+            if (!raw) return;
+
+            const paragraphNumber = Number.parseInt(raw, 10);
+            if (!Number.isFinite(paragraphNumber) || paragraphNumber <= 0) return;
+
+            await this.__jumpToParagraphNumber(paragraphNumber);
+        };
+
+        menuElements.jumpGoBtn.addEventListener('click', async () => {
+            await doJump();
+        });
+
+        menuElements.jumpInput.addEventListener('keydown', async (e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            await doJump();
         });
 
         menuElements.rateDropdown.addEventListener('change', async (e) => {
@@ -868,7 +904,51 @@ class ReadAloudModule {
         await this.__clearBuffer(state, idx);
     }
 
-    async __clearBuffer(state, idx = null) {
+    async __jumpToParagraphNumber(paragraphNumber) {
+        const state = window.readAloudState;
+        if (!state.paragraphs || state.paragraphs.length === 0) return;
+
+        const idx = paragraphNumber - 1;
+        if (idx < 0 || idx >= state.paragraphs.length) return;
+
+        const shouldResume = !state.paused;
+
+        this.__FOHighlight(state.paragraphs[state.currentParagraphIndex]);
+
+        if (state.currentAudio) {
+            state.currentAudio.pause();
+            state.currentAudio.currentTime = 0;
+            state.currentAudio = null;
+        }
+
+        await this.__stopAsync();
+        state.buffer = null;
+
+        state.currentParagraphIndex = idx;
+        state.currentParagraphId = state.paragraphs[idx].id;
+
+        this.__highlightP(state.paragraphs[idx]);
+        this.__scrollToP(state.paragraphs[idx]);
+
+        localStorage.setItem('readAloudAudioPosition', JSON.stringify({
+            paragraphId: state.currentParagraphId,
+            paragraphIndex: state.currentParagraphIndex
+        }));
+
+        forceBookmark(state.currentParagraphId);
+
+        if (!shouldResume) {
+            state.paused = true;
+            const playPauseBtn = document.getElementById('read-aloud-toggle-playpause');
+            if (playPauseBtn) playPauseBtn.textContent = this.#buttons.play.icon;
+            return;
+        }
+
+        state.paused = false;
+        await this.__clearBuffer(state, idx);
+    }
+
+    async __clearBuffer(state, idx) {
         const pausedState = state.paused;
         state.buffer = null;
         await this.__stopAsync();
@@ -876,7 +956,7 @@ class ReadAloudModule {
 
         if (state.paused) return;
 
-        const nextIdx = idx !== undefined ? idx : (state.currentParagraphIndex ?? 0);
+        const nextIdx = idx == null ? (state.currentParagraphIndex ?? 0) : idx;
         await this.__speakP(nextIdx);
     }
 
