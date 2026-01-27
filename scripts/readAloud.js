@@ -8,6 +8,7 @@ class ReadAloudModule {
     #REGIONS;
     #MENU_HTML;
     #HELP_MODAL;
+    #JUMP_VIS_KEY = 'readAloudJumpVisible';
 
     #boundShowMenu;
     #boundReload;
@@ -28,6 +29,7 @@ class ReadAloudModule {
             config: { icon: '⚙️', action: 'Configure Read Aloud' },
             hide: { icon: '👁️', action: 'Hides Read Aloud menu' },
             info: { icon: 'ℹ️', action: 'Show Info' },
+            jump: { icon: '🧭', action: 'Show or hide jump to paragraph' },
             help: { icon: '❓', action: 'Help' }
         };
 
@@ -79,6 +81,7 @@ class ReadAloudModule {
                     <button id="read-aloud-info" title="${this.#buttons.info.action}">${this.#buttons.info.icon}</button>
                     <button id="read-aloud-hide" class = "menu-crossed" title="${this.#buttons.hide.action}">${this.#buttons.hide.icon}</button>
                     <button id="read-aloud-config" class = "menu-crossed" title="${this.#buttons.config.action}">${this.#buttons.config.icon}</button>
+                    <button id="read-aloud-jump-toggle" class="menu-crossed" title="${this.#buttons.jump.action}">${this.#buttons.jump.icon}</button>
                     <button id="read-aloud-help" title="${this.#buttons.help.action}">${this.#buttons.help.icon}</button>
                     <div class="read-aloud-jump">
                         <input
@@ -145,6 +148,7 @@ class ReadAloudModule {
             speechRate: 1.0,
             configVisible: false,
             menuVisible: true,
+            jumpVisible: true,
             buffer: null,
             currentAudioUrl: null,
         };
@@ -247,6 +251,7 @@ class ReadAloudModule {
         if (menu.style.display === 'flex') return;
 
         menu.innerHTML = this.#MENU_HTML;
+
         menu.style.display = 'flex';
 
         const menuElements = {
@@ -263,6 +268,8 @@ class ReadAloudModule {
             hideBtn: document.getElementById('read-aloud-hide'),
             infoBtn: document.getElementById('read-aloud-info'),
             helpBtn: document.getElementById('read-aloud-help'),
+            jumpToggleBtn: document.getElementById('read-aloud-jump-toggle'),
+            jumpWrap: document.querySelector('.read-aloud-jump'),
             jumpInput: document.getElementById('read-aloud-jump-input'),
             jumpGoBtn: document.getElementById('read-aloud-jump-go')
         };
@@ -275,6 +282,10 @@ class ReadAloudModule {
             console.error('Read Aloud menu elements not found:', missing);
             return;
         }
+
+        const savedJumpVis = localStorage.getItem(this.#JUMP_VIS_KEY);
+        const jumpVisible = savedJumpVis == null ? true : savedJumpVis === 'true';
+        this.__toggleJump(jumpVisible);
 
         menuElements.apikeyInput.value = localStorage.getItem('readAloudSpeechApiKey') || '';
 
@@ -348,6 +359,10 @@ class ReadAloudModule {
 
         menuElements.hideBtn.addEventListener('click', () => {
             this.__toggleVis();
+        });
+
+        menuElements.jumpToggleBtn.addEventListener('click', () => {
+            this.__toggleJump();
         });
 
         const doJump = async () => {
@@ -445,6 +460,25 @@ class ReadAloudModule {
         window.readAloudState.configVisible = newValue;
         localStorage.setItem('readAloudConfigVisible', String(newValue));
         localStorage.setItem('readAloudConfigMenuHidden', !newValue);
+
+        return newValue;
+    }
+
+    __toggleJump(forceValue = null) {
+        const jumpWrap = document.querySelector('.read-aloud-jump');
+        const btn = document.getElementById('read-aloud-jump-toggle');
+        if (!jumpWrap || !btn) return;
+
+        const current = window.readAloudState.jumpVisible;
+        const newValue = forceValue !== null ? !!forceValue : !current;
+
+        jumpWrap.style.display = newValue ? 'flex' : 'none';
+
+        // Your convention: "menu-crossed" means ON/visible
+        btn.classList.toggle('menu-crossed', newValue);
+
+        window.readAloudState.jumpVisible = newValue;
+        localStorage.setItem(this.#JUMP_VIS_KEY, String(newValue));
 
         return newValue;
     }
