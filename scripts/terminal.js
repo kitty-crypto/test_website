@@ -378,9 +378,10 @@ function attachWebSocketTransport(term, scrollCtl, opts = {}) {
         // Run nekofetch once, as if typed by the user
         setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
+                ws.send("clear\r");
                 ws.send("nekofetch\r");
             }
-        }, 200);
+        }, 10);
     });
 
     ws.addEventListener("message", (ev) => {
