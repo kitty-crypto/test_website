@@ -380,7 +380,7 @@ function attachWebSocketTransport(term, scrollCtl, opts = {}) {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send("nekofetch\r");
             }
-        }, 50);
+        }, 200);
     });
 
     ws.addEventListener("message", (ev) => {
